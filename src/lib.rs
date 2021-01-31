@@ -43,7 +43,7 @@
    }
 */
 
-pub use heapless_bytes::{consts, Bytes};
+pub use heapless_bytes::{consts, Bytes as ByteBuf};
 use serde::Serialize;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -70,6 +70,8 @@ enum Kty {
 enum Alg {
     Es256 = -7, // ECDSA with SHA-256
     EdDsa = -8,
+    Totp = -9, // Unassigned, we use it for TOTP
+
     // MAC
     // Hs256 = 5,
     // Hs512 = 7,
@@ -81,12 +83,13 @@ enum Alg {
     // ChaCha20Poly1305 = 24,
 
     // Key Agreement
-    EcdhEsHkdf256 = -25, // ES = ephemerial-static
+    EcdhEsHkdf256 = -25, // ES = ephemeral-static
 }
 
 #[repr(i8)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize_repr, Deserialize_repr)]
 enum Crv {
+    None = 0,
     P256 = 1,
     // P384 = 2,
     // P512 = 3,
@@ -102,7 +105,9 @@ enum Crv {
 #[serde(untagged)]
 pub enum PublicKey {
     P256Key(P256PublicKey),
+    EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey),
     Ed25519Key(Ed25519PublicKey),
+    TotpKey(TotpPublicKey),
 }
 
 impl From<P256PublicKey> for PublicKey {
@@ -111,9 +116,21 @@ impl From<P256PublicKey> for PublicKey {
     }
 }
 
+impl From<EcdhEsHkdf256PublicKey> for PublicKey {
+    fn from(key: EcdhEsHkdf256PublicKey) -> Self {
+        PublicKey::EcdhEsHkdf256Key(key)
+    }
+}
+
 impl From<Ed25519PublicKey> for PublicKey {
     fn from(key: Ed25519PublicKey) -> Self {
         PublicKey::Ed25519Key(key)
+    }
+}
+
+impl From<TotpPublicKey> for PublicKey {
+    fn from(key: TotpPublicKey) -> Self {
+        PublicKey::TotpKey(key)
     }
 }
 
@@ -125,8 +142,8 @@ trait PublicKeyConstants {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct P256PublicKey {
-    pub x: Bytes<consts::U32>,
-    pub y: Bytes<consts::U32>,
+    pub x: ByteBuf<consts::U32>,
+    pub y: ByteBuf<consts::U32>,
 }
 
 impl PublicKeyConstants for P256PublicKey {
@@ -136,8 +153,20 @@ impl PublicKeyConstants for P256PublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EcdhEsHkdf256PublicKey {
+    pub x: ByteBuf<consts::U32>,
+    pub y: ByteBuf<consts::U32>,
+}
+
+impl PublicKeyConstants for EcdhEsHkdf256PublicKey {
+    const KTY: Kty = Kty::Ec2;
+    const ALG: Alg = Alg::EcdhEsHkdf256;
+    const CRV: Crv = Crv::P256;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ed25519PublicKey {
-    pub x: Bytes<consts::U32>,
+    pub x: ByteBuf<consts::U32>,
 }
 
 impl PublicKeyConstants for Ed25519PublicKey {
@@ -146,12 +175,77 @@ impl PublicKeyConstants for Ed25519PublicKey {
     const CRV: Crv = Crv::Ed25519;
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct TotpPublicKey {}
+
+impl PublicKeyConstants for TotpPublicKey {
+    const KTY: Kty = Kty::Symmetric;
+    const ALG: Alg = Alg::Totp;
+    const CRV: Crv = Crv::None;
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct X25519PublicKey {
-    pub pub_key: Bytes<consts::U32>,
+    pub pub_key: ByteBuf<consts::U32>,
+}
+
+// impl serde::Serialize for PublicKey {
+//     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         match self {
+//             PublicKey::P256Key(key) => key.serialize(serializer),
+//             PublicKey::EcdhEsHkdf256Key(key) => key.serialize(serializer),
+//             PublicKey::Ed25519Key(key) => key.serialize(serializer),
+//         }
+//     }
+// }
+
+impl serde::Serialize for TotpPublicKey {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        // let mut map = serializer.serialize_map(Some(3))?;
+        let mut map = serializer.serialize_map(Some(2))?;
+
+        //  1: kty
+        map.serialize_entry(&(Label::Kty as i8), &(Self::KTY as i8))?;
+        //  3: alg
+        map.serialize_entry(&(Label::Alg as i8), &(Self::ALG as i8))?;
+        // // -1: crv
+        // map.serialize_entry(&(Label::Crv as i8), &(Self::CRV as i8))?;
+
+        map.end()
+    }
 }
 
 impl serde::Serialize for P256PublicKey {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(5))?;
+
+        //  1: kty
+        map.serialize_entry(&(Label::Kty as i8), &(Self::KTY as i8))?;
+        //  3: alg
+        map.serialize_entry(&(Label::Alg as i8), &(Self::ALG as i8))?;
+        // -1: crv
+        map.serialize_entry(&(Label::Crv as i8), &(Self::CRV as i8))?;
+        // -2: x
+        map.serialize_entry(&(Label::X as i8), &self.x)?;
+        // -3: y
+        map.serialize_entry(&(Label::Y as i8), &self.y)?;
+
+        map.end()
+    }
+}
+
+impl serde::Serialize for EcdhEsHkdf256PublicKey {
     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -250,6 +344,67 @@ impl<'de> serde::Deserialize<'de> for P256PublicKey {
                 };
 
                 Ok(P256PublicKey { x, y })
+            }
+        }
+        deserializer.deserialize_map(IndexedVisitor {})
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for EcdhEsHkdf256PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct IndexedVisitor;
+        impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
+            type Value = EcdhEsHkdf256PublicKey;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                formatter.write_str("EcdhEsHkdf256PublicKey")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<EcdhEsHkdf256PublicKey, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                // implies kty-specific params
+                match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::Kty), Some(EcdhEsHkdf256PublicKey::KTY)) => {}
+                    _ => {
+                        return Err(serde::de::Error::missing_field("kty"));
+                    }
+                }
+
+                // restricts key usage - check!
+                match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::Alg), Some(EcdhEsHkdf256PublicKey::ALG)) => {}
+                    _ => {
+                        return Err(serde::de::Error::missing_field("alg"));
+                    }
+                }
+
+                match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::Crv), Some(EcdhEsHkdf256PublicKey::CRV)) => {}
+                    _ => {
+                        return Err(serde::de::Error::missing_field("crv"));
+                    }
+                }
+
+                let x = match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::X), Some(bytes)) => bytes,
+                    _ => {
+                        return Err(serde::de::Error::missing_field("x"));
+                    }
+                };
+
+                let y = match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::Y), Some(bytes)) => bytes,
+                    _ => {
+                        return Err(serde::de::Error::missing_field("y"));
+                    }
+                };
+
+                Ok(EcdhEsHkdf256PublicKey { x, y })
             }
         }
         deserializer.deserialize_map(IndexedVisitor {})
