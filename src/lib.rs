@@ -44,7 +44,7 @@
 */
 
 pub use heapless_bytes::Bytes;
-use serde::Serialize;
+use serde_derive::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[repr(i8)]
@@ -101,7 +101,7 @@ enum Crv {
 
 // `Deserialize` can't be derived on untagged enum,
 // would need to "sniff" for correct (Kty, Alg, Crv) triple
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PublicKey {
     P256Key(P256PublicKey),
@@ -459,6 +459,44 @@ impl<'de> serde::Deserialize<'de> for Ed25519PublicKey {
                 };
 
                 Ok(Ed25519PublicKey { x })
+            }
+        }
+        deserializer.deserialize_map(IndexedVisitor {})
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TotpPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct IndexedVisitor;
+        impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
+            type Value = TotpPublicKey;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                formatter.write_str("TotpPublicKey")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<TotpPublicKey, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::Kty), Some(TotpPublicKey::KTY)) => {}
+                    _ => {
+                        return Err(serde::de::Error::missing_field("kty"));
+                    }
+                }
+
+                match (map.next_key()?, map.next_value()?) {
+                    (Some(Label::Alg), Some(TotpPublicKey::ALG)) => {}
+                    _ => {
+                        return Err(serde::de::Error::missing_field("alg"));
+                    }
+                }
+
+                Ok(TotpPublicKey {})
             }
         }
         deserializer.deserialize_map(IndexedVisitor {})
