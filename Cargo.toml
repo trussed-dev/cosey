@@ -12,6 +12,13 @@ edition = "2021"
 
 [dependencies]
 heapless-bytes = "0.3.0"
-serde = "1.0"
+serde_repr = "0.1.10"
 serde_derive = "1.0"
-serde_repr = "0.1.6"
+
+[dependencies.serde]
+version = "1.0"
+default-features = false
+features = ["derive", "alloc"]
+
+[dev-dependencies]
+serde_test = "1.0"

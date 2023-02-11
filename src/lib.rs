@@ -99,8 +99,6 @@ enum Crv {
     // Ed448 = 7,
 }
 
-// `Deserialize` can't be derived on untagged enum,
-// would need to "sniff" for correct (Kty, Alg, Crv) triple
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PublicKey {
@@ -500,5 +498,109 @@ impl<'de> serde::Deserialize<'de> for TotpPublicKey {
             }
         }
         deserializer.deserialize_map(IndexedVisitor {})
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use heapless_bytes::Bytes;
+    use serde_test::{assert_tokens, Token};
+
+    use super::{
+        EcdhEsHkdf256PublicKey, Ed25519PublicKey, Label, P256PublicKey, PublicKey,
+        PublicKeyConstants, TotpPublicKey,
+    };
+
+    #[test]
+    fn deserialize_publickey_p256key() {
+        let x = &[1; 32];
+        let y = &[2; 32];
+        let expected = PublicKey::P256Key(P256PublicKey {
+            x: Bytes::from_slice(x).unwrap(),
+            y: Bytes::from_slice(y).unwrap(),
+        });
+        assert_tokens(
+            &expected,
+            &[
+                Token::Map { len: Some(5) },
+                Token::I8(Label::Kty as i8),
+                Token::I8(P256PublicKey::KTY as i8),
+                Token::I8(Label::Alg as i8),
+                Token::I8(P256PublicKey::ALG as i8),
+                Token::I8(Label::Crv as i8),
+                Token::I8(P256PublicKey::CRV as i8),
+                Token::I8(Label::X as i8),
+                Token::Bytes(x),
+                Token::I8(Label::Y as i8),
+                Token::Bytes(y),
+                Token::MapEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn deserialize_publickey_ecdheshkdf256() {
+        let x = &[1; 32];
+        let y = &[2; 32];
+        let expected = PublicKey::EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey {
+            x: Bytes::from_slice(x).unwrap(),
+            y: Bytes::from_slice(y).unwrap(),
+        });
+        assert_tokens(
+            &expected,
+            &[
+                Token::Map { len: Some(5) },
+                Token::I8(Label::Kty as i8),
+                Token::I8(EcdhEsHkdf256PublicKey::KTY as i8),
+                Token::I8(Label::Alg as i8),
+                Token::I8(EcdhEsHkdf256PublicKey::ALG as i8),
+                Token::I8(Label::Crv as i8),
+                Token::I8(EcdhEsHkdf256PublicKey::CRV as i8),
+                Token::I8(Label::X as i8),
+                Token::Bytes(x),
+                Token::I8(Label::Y as i8),
+                Token::Bytes(y),
+                Token::MapEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn deserialize_publickey_ed25519key() {
+        let x = &[1; 32];
+        let expected = PublicKey::Ed25519Key(Ed25519PublicKey {
+            x: Bytes::from_slice(x).unwrap(),
+        });
+        assert_tokens(
+            &expected,
+            &[
+                Token::Map { len: Some(4) },
+                Token::I8(Label::Kty as i8),
+                Token::I8(Ed25519PublicKey::KTY as i8),
+                Token::I8(Label::Alg as i8),
+                Token::I8(Ed25519PublicKey::ALG as i8),
+                Token::I8(Label::Crv as i8),
+                Token::I8(Ed25519PublicKey::CRV as i8),
+                Token::I8(Label::X as i8),
+                Token::Bytes(x),
+                Token::MapEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn deserialize_publickey_totpkey() {
+        let expected = PublicKey::TotpKey(TotpPublicKey {});
+        assert_tokens(
+            &expected,
+            &[
+                Token::Map { len: Some(2) },
+                Token::I8(Label::Kty as i8),
+                Token::I8(TotpPublicKey::KTY as i8),
+                Token::I8(Label::Alg as i8),
+                Token::I8(TotpPublicKey::ALG as i8),
+                Token::MapEnd,
+            ],
+        );
     }
 }
