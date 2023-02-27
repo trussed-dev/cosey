@@ -18,3 +18,8 @@ serde_repr = "0.1"
 version = "1.0"
 default-features = false
 features = ["derive"]
+
+[dev-dependencies]
+cbor-smol = "0.4"
+hex = "0.4.3"
+quickcheck = "1.0.3"
