@@ -43,8 +43,8 @@
    }
 */
 
-pub use heapless_bytes::Bytes;
 use core::fmt::{self, Formatter};
+pub use heapless_bytes::Bytes;
 use serde::{
     de::{Error as _, Expected, MapAccess, Unexpected},
     Deserialize, Serialize,
