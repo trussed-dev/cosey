@@ -45,10 +45,14 @@
 
 use core::fmt::{self, Formatter};
 pub use heapless_bytes::Bytes;
+#[cfg(feature = "backend-dilithium")]
+use pqcrypto_dilithium::ffi;
 use serde::{
     de::{Error as _, Expected, MapAccess, Unexpected},
     Deserialize, Serialize,
 };
+#[cfg(feature = "backend-dilithium")]
+use serde_big_array::BigArray;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[repr(i8)]
@@ -101,6 +105,13 @@ enum Alg {
     EdDsa = -8,
     Totp = -9, // Unassigned, we use it for TOTP
 
+    #[cfg(feature = "backend-dilithium2")]
+    Dilithium2 = -87,
+    #[cfg(feature = "backend-dilithium3")]
+    Dilithium3 = -88,
+    #[cfg(feature = "backend-dilithium5")]
+    Dilithium5 = -89,
+
     // MAC
     // Hs256 = 5,
     // Hs512 = 7,
@@ -149,6 +160,12 @@ pub enum PublicKey {
     EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey),
     Ed25519Key(Ed25519PublicKey),
     TotpKey(TotpPublicKey),
+    #[cfg(feature = "backend-dilithium2")]
+    Dilithium2(Dilithium2PublicKey),
+    #[cfg(feature = "backend-dilithium3")]
+    Dilithium3(Dilithium3PublicKey),
+    #[cfg(feature = "backend-dilithium5")]
+    Dilithium5(Dilithium5PublicKey),
 }
 
 impl From<P256PublicKey> for PublicKey {
@@ -172,6 +189,26 @@ impl From<Ed25519PublicKey> for PublicKey {
 impl From<TotpPublicKey> for PublicKey {
     fn from(key: TotpPublicKey) -> Self {
         PublicKey::TotpKey(key)
+    }
+}
+
+#[cfg(feature = "backend-dilithium2")]
+impl From<Dilithium2PublicKey> for PublicKey {
+    fn from(key: Dilithium2PublicKey) -> Self {
+        PublicKey::Dilithium2(key)
+    }
+}
+
+#[cfg(feature = "backend-dilithium3")]
+impl From<Dilithium3PublicKey> for PublicKey {
+    fn from(key: Dilithium3PublicKey) -> Self {
+        PublicKey::Dilithium3(key)
+    }
+}
+#[cfg(feature = "backend-dilithium5")]
+impl From<Dilithium5PublicKey> for PublicKey {
+    fn from(key: Dilithium5PublicKey) -> Self {
+        PublicKey::Dilithium5(key)
     }
 }
 
@@ -489,5 +526,37 @@ impl<'de> serde::Deserialize<'de> for Ed25519PublicKey {
         check_key_constants::<Ed25519PublicKey, D::Error>(kty, alg, crv)?;
         let x = x.ok_or_else(|| D::Error::missing_field("x"))?;
         Ok(Self { x })
+    }
+}
+
+macro_rules! dilithium_public_key {
+    ($type_name: ident, $size: expr) => {
+        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+        pub struct $type_name(#[serde(with = "BigArray")] [u8; $size]);
+    };
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "backend-dilithium2")] {
+        dilithium_public_key!(
+            Dilithium2PublicKey,
+            ffi::PQCLEAN_DILITHIUM2_CLEAN_CRYPTO_PUBLICKEYBYTES
+        );
+    }
+}
+cfg_if::cfg_if! {
+    if #[cfg(feature = "backend-dilithium3")] {
+        dilithium_public_key!(
+            Dilithium3PublicKey,
+            ffi::PQCLEAN_DILITHIUM3_CLEAN_CRYPTO_PUBLICKEYBYTES
+        );
+    }
+}
+cfg_if::cfg_if! {
+    if #[cfg(feature = "backend-dilithium5")] {
+        dilithium_public_key!(
+            Dilithium5PublicKey,
+            ffi::PQCLEAN_DILITHIUM5_CLEAN_CRYPTO_PUBLICKEYBYTES
+        );
     }
 }
