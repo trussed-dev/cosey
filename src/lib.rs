@@ -529,6 +529,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519PublicKey {
     }
 }
 
+#[cfg(feature = "backend-dilithium")]
 macro_rules! dilithium_public_key {
     ($type_name: ident, $size: expr) => {
         #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
