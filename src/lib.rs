@@ -48,12 +48,12 @@ use ::with_builtin_macros::with_eager_expansions;
 use core::fmt::{self, Formatter};
 pub use heapless_bytes::Bytes;
 use paste::paste;
-#[cfg(feature = "backend-dilithium2")]
-use pqcrypto_dilithium::dilithium2;
-#[cfg(feature = "backend-dilithium3")]
-use pqcrypto_dilithium::dilithium3;
-#[cfg(feature = "backend-dilithium5")]
-use pqcrypto_dilithium::dilithium5;
+#[cfg(feature = "backend-mldsa-44")]
+use pqcrypto_mldsa::mldsa44;
+#[cfg(feature = "backend-mldsa-65")]
+use pqcrypto_mldsa::mldsa65;
+#[cfg(feature = "backend-mldsa-87")]
+use pqcrypto_mldsa::mldsa87;
 use serde::{
     de::{Error as _, Expected, MapAccess, Unexpected},
     Deserialize, Serialize,
@@ -95,7 +95,7 @@ enum Kty {
     Okp = 1,
     Ec2 = 2,
     Symmetric = 4,
-    #[cfg(feature = "backend-dilithium")]
+    #[cfg(feature = "backend-mldsa")]
     Pqc = 7,
 }
 
@@ -112,12 +112,12 @@ enum Alg {
     EdDsa = -8,
     Totp = -9, // Unassigned, we use it for TOTP
 
-    #[cfg(feature = "backend-dilithium2")]
-    Dilithium2 = -87,
-    #[cfg(feature = "backend-dilithium3")]
-    Dilithium3 = -88,
-    #[cfg(feature = "backend-dilithium5")]
-    Dilithium5 = -89,
+    #[cfg(feature = "backend-mldsa-44")]
+    Mldsa44 = -87,
+    #[cfg(feature = "backend-mldsa-65")]
+    Mldsa65 = -88,
+    #[cfg(feature = "backend-mldsa-87")]
+    Mldsa87 = -89,
 
     // MAC
     // Hs256 = 5,
@@ -167,12 +167,12 @@ pub enum PublicKey {
     EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey),
     Ed25519Key(Ed25519PublicKey),
     TotpKey(TotpPublicKey),
-    #[cfg(feature = "backend-dilithium2")]
-    Dilithium2(Dilithium2PublicKey),
-    #[cfg(feature = "backend-dilithium3")]
-    Dilithium3(Dilithium3PublicKey),
-    #[cfg(feature = "backend-dilithium5")]
-    Dilithium5(Dilithium5PublicKey),
+    #[cfg(feature = "backend-mldsa-44")]
+    Mldsa44(Mldsa44PublicKey),
+    #[cfg(feature = "backend-mldsa-65")]
+    Mldsa65(Mldsa65PublicKey),
+    #[cfg(feature = "backend-mldsa-87")]
+    Mldsa87(Mldsa87PublicKey),
 }
 
 impl From<P256PublicKey> for PublicKey {
@@ -516,73 +516,73 @@ impl<'de> serde::Deserialize<'de> for Ed25519PublicKey {
     }
 }
 
-#[cfg(feature = "backend-dilithium")]
-macro_rules! dilithium_public_key {
-    ($dilithium_number: tt) => {
+#[cfg(feature = "backend-mldsa")]
+macro_rules! mldsa_public_key {
+    ($mldsa_number: tt) => {
         paste! {
             with_eager_expansions! {
                 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-                #[serde(into = #{ concat!("RawDilithium", stringify!($dilithium_number), "PublicKey") })]
-                pub struct [<Dilithium $dilithium_number PublicKey>] {
-                    pub pk: Bytes<{ [<dilithium $dilithium_number>]::public_key_bytes() }>,
+                #[serde(into = #{ concat!("RawMldsa", stringify!($mldsa_number), "PublicKey") })]
+                pub struct [<Mldsa $mldsa_number PublicKey>] {
+                    pub pk: Bytes<{ [<mldsa $mldsa_number>]::public_key_bytes() }>,
                 }
 
-                impl PublicKeyConstants for [<Dilithium $dilithium_number PublicKey>] {
+                impl PublicKeyConstants for [<Mldsa $mldsa_number PublicKey>] {
                     const KTY: Kty = Kty::Pqc;
-                    const ALG: Alg = Alg::[<Dilithium $dilithium_number>];
+                    const ALG: Alg = Alg::[<Mldsa $mldsa_number>];
                     const CRV: Crv = Crv::None;
                 }
 
-                impl From<[<Dilithium $dilithium_number PublicKey>]> for PublicKey {
-                    fn from(key: [<Dilithium $dilithium_number PublicKey>]) -> Self {
-                        PublicKey::[<Dilithium $dilithium_number>](key)
+                impl From<[<Mldsa $mldsa_number PublicKey>]> for PublicKey {
+                    fn from(key: [<Mldsa $mldsa_number PublicKey>]) -> Self {
+                        PublicKey::[<Mldsa $mldsa_number>](key)
                     }
                 }
 
                 #[derive(Clone, Debug, Default)]
-                struct [<RawDilithium $dilithium_number PublicKey>] {
+                struct [<RawMldsa $mldsa_number PublicKey>] {
                     kty: Option<Kty>,
                     alg: Option<Alg>,
-                    pk: Option<Bytes<{ [<dilithium $dilithium_number>]::public_key_bytes() }>>,
+                    pk: Option<Bytes<{ [<mldsa $mldsa_number>]::public_key_bytes() }>>,
                 }
 
-                impl From<[<Dilithium $dilithium_number PublicKey>]> for [<RawDilithium $dilithium_number PublicKey>] {
-                    fn from(key: [<Dilithium $dilithium_number PublicKey>]) -> Self {
+                impl From<[<Mldsa $mldsa_number PublicKey>]> for [<RawMldsa $mldsa_number PublicKey>] {
+                    fn from(key: [<Mldsa $mldsa_number PublicKey>]) -> Self {
                         Self {
-                            kty: Some([<Dilithium $dilithium_number PublicKey>]::KTY),
-                            alg: Some([<Dilithium $dilithium_number PublicKey>]::ALG),
+                            kty: Some([<Mldsa $mldsa_number PublicKey>]::KTY),
+                            alg: Some([<Mldsa $mldsa_number PublicKey>]::ALG),
                             pk: Some(key.pk),
                         }
                     }
                 }
 
-                impl<'de> serde::Deserialize<'de> for [<Dilithium $dilithium_number PublicKey>] {
+                impl<'de> serde::Deserialize<'de> for [<Mldsa $mldsa_number PublicKey>] {
                     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                     where
                         D: serde::Deserializer<'de>,
                     {
-                        let [<RawDilithium $dilithium_number PublicKey>] { kty, alg, pk, .. } =
-                        [<RawDilithium $dilithium_number PublicKey>]::deserialize(deserializer)?;
-                        check_key_constants::<[<Dilithium $dilithium_number PublicKey>], D::Error>(kty, alg, Some(Crv::None))?;
+                        let [<RawMldsa $mldsa_number PublicKey>] { kty, alg, pk, .. } =
+                        [<RawMldsa $mldsa_number PublicKey>]::deserialize(deserializer)?;
+                        check_key_constants::<[<Mldsa $mldsa_number PublicKey>], D::Error>(kty, alg, Some(Crv::None))?;
                         let pk = pk.ok_or_else(|| D::Error::missing_field("pk"))?;
                         Ok(Self { pk })
                     }
                 }
 
-                impl<'de> Deserialize<'de> for [<RawDilithium $dilithium_number PublicKey>] {
+                impl<'de> Deserialize<'de> for [<RawMldsa $mldsa_number PublicKey>] {
                     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                     where
                         D: serde::Deserializer<'de>,
                     {
                         struct IndexedVisitor;
                         impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
-                            type Value = [<RawDilithium $dilithium_number PublicKey>];
+                            type Value = [<RawMldsa $mldsa_number PublicKey>];
 
                             fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
-                                formatter.write_str(concat!("RawDilithium", stringify!($dilithium_number), "PublicKey"))
+                                formatter.write_str(concat!("RawMldsa", stringify!($mldsa_number), "PublicKey"))
                             }
 
-                            fn visit_map<V>(self, mut map: V) -> Result<[<RawDilithium $dilithium_number PublicKey>], V::Error>
+                            fn visit_map<V>(self, mut map: V) -> Result<[<RawMldsa $mldsa_number PublicKey>], V::Error>
                             where
                                 V: MapAccess<'de>,
                             {
@@ -605,7 +605,7 @@ macro_rules! dilithium_public_key {
                                     Ok(key)
                                 }
 
-                                let mut public_key = [<RawDilithium $dilithium_number PublicKey>]::default();
+                                let mut public_key = [<RawMldsa $mldsa_number PublicKey>]::default();
 
                                 // As we cannot deserialize arbitrary values with cbor-smol, we do not support
                                 // unknown keys before a known key.  If there are unknown keys, they must be at the
@@ -644,7 +644,7 @@ macro_rules! dilithium_public_key {
                     }
                 }
 
-                impl Serialize for [<RawDilithium $dilithium_number PublicKey>] {
+                impl Serialize for [<RawMldsa $mldsa_number PublicKey>] {
                     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
                     where
                         S: serde::Serializer,
@@ -675,9 +675,9 @@ macro_rules! dilithium_public_key {
     };
 }
 
-#[cfg(feature = "backend-dilithium2")]
-dilithium_public_key!(2);
-#[cfg(feature = "backend-dilithium3")]
-dilithium_public_key!(3);
-#[cfg(feature = "backend-dilithium5")]
-dilithium_public_key!(5);
+#[cfg(feature = "backend-mldsa-44")]
+mldsa_public_key!(44);
+#[cfg(feature = "backend-mldsa-65")]
+mldsa_public_key!(65);
+#[cfg(feature = "backend-mldsa-87")]
+mldsa_public_key!(87);

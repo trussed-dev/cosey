@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 cfg-if = "1.0.0"
 heapless-bytes = "0.3.0"
-pqcrypto-dilithium = { version = "0.5.0", optional = true}
+pqcrypto-mldsa = { version = "0.1.0", optional = true}
 serde-big-array = "0.5.1"
 serde_repr = "0.1"
 paste = "1.0"
@@ -33,7 +33,7 @@ quickcheck = "1.0.3"
 serde = "1"
 
 [features]
-backend-dilithium = ["dep:pqcrypto-dilithium"]
-backend-dilithium2 = ["backend-dilithium"]
-backend-dilithium3 = ["backend-dilithium"]
-backend-dilithium5 = ["backend-dilithium"]
+backend-mldsa = ["dep:pqcrypto-mldsa"]
+backend-mldsa-44 = ["backend-mldsa"]
+backend-mldsa-65 = ["backend-mldsa"]
+backend-mldsa-87 = ["backend-mldsa"]
