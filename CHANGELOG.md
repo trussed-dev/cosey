@@ -4,7 +4,15 @@
 
 -
 
-[All Changes](https://github.com/trussed-dev/cosey/compare/v0.3.1...HEAD)
+[All Changes](https://github.com/trussed-dev/cosey/compare/v0.3.2...HEAD)
+
+## [v0.3.2](https://github.com/trussed-dev/cosey/releases/tag/v0.3.2) (2025-02-26)
+
+### Added
+
+- Implement `Deserialize` for `PublicKey` ([#12](https://github.com/trussed-dev/cosey/pull/12))
+
+[All Changes](https://github.com/trussed-dev/cosey/compare/v0.3.1...v0.3.2)
 
 ## [v0.3.1](https://github.com/trussed-dev/cosey/releases/tag/v0.3.1) (2024-06-03)
 
