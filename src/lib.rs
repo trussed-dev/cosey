@@ -158,9 +158,8 @@ impl Expected for Crv {
     }
 }
 
-// `Deserialize` can't be derived on untagged enum,
-// would need to "sniff" for correct (Kty, Alg, Crv) triple
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RawPublicKey")]
 #[serde(untagged)]
 pub enum PublicKey {
     P256Key(P256PublicKey),
@@ -196,6 +195,44 @@ impl From<Ed25519PublicKey> for PublicKey {
 impl From<TotpPublicKey> for PublicKey {
     fn from(key: TotpPublicKey) -> Self {
         PublicKey::TotpKey(key)
+    }
+}
+
+impl TryFrom<RawPublicKey> for PublicKey {
+    type Error = serde::de::value::Error;
+
+    fn try_from(raw: RawPublicKey) -> Result<Self, Self::Error> {
+        match raw {
+            RawPublicKey {
+                kty: Some(Kty::Ec2),
+                alg: Some(Alg::Es256),
+                crv: Some(Crv::P256),
+                x: Some(x),
+                y: Some(y),
+            } => Ok(PublicKey::P256Key(P256PublicKey { x, y })),
+            RawPublicKey {
+                kty: Some(Kty::Ec2),
+                alg: Some(Alg::EcdhEsHkdf256),
+                crv: Some(Crv::P256),
+                x: Some(x),
+                y: Some(y),
+            } => Ok(PublicKey::EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey { x, y })),
+            RawPublicKey {
+                kty: Some(Kty::Okp),
+                alg: Some(Alg::EdDsa),
+                crv: Some(Crv::Ed25519),
+                x: Some(x),
+                y: None,
+            } => Ok(PublicKey::Ed25519Key(Ed25519PublicKey { x })),
+            RawPublicKey {
+                kty: Some(Kty::Symmetric),
+                alg: Some(Alg::Totp),
+                crv: None,
+                x: None,
+                y: None,
+            } => Ok(PublicKey::TotpKey(TotpPublicKey {})),
+            _ => Err(serde::de::Error::custom("invalid key data")),
+        }
     }
 }
 

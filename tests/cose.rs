@@ -2,7 +2,7 @@ use core::fmt::Debug;
 
 use cbor_smol::{cbor_deserialize, cbor_serialize_bytes};
 use ciborium::Value;
-use cosey::{EcdhEsHkdf256PublicKey, Ed25519PublicKey, P256PublicKey};
+use cosey::{EcdhEsHkdf256PublicKey, Ed25519PublicKey, P256PublicKey, PublicKey};
 use heapless_bytes::Bytes;
 use itertools::Itertools as _;
 use quickcheck::{Arbitrary, Gen};
@@ -202,7 +202,9 @@ fn de_p256() {
     let x = Bytes::from_slice(&[0xff; 32]).unwrap();
     let y = Bytes::from_slice(&[0xff; 32]).unwrap();
     let key = P256PublicKey { x, y };
-    test_de("a5010203262001215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff225820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", key);
+    let data = "a5010203262001215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff225820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    test_de(data, key.clone());
+    test_de(data, PublicKey::P256Key(key));
 }
 
 #[test]
@@ -210,17 +212,19 @@ fn de_ecdh() {
     let x = Bytes::from_slice(&[0xff; 32]).unwrap();
     let y = Bytes::from_slice(&[0xff; 32]).unwrap();
     let key = EcdhEsHkdf256PublicKey { x, y };
-    test_de("a501020338182001215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff225820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", key);
+    let data = "a501020338182001215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff225820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    test_de(data, key.clone());
+    test_de(data, PublicKey::EcdhEsHkdf256Key(key));
 }
 
 #[test]
 fn de_ed25519() {
     let x = Bytes::from_slice(&[0xff; 32]).unwrap();
     let key = Ed25519PublicKey { x };
-    test_de(
-        "a4010103272006215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        key,
-    );
+    let data =
+        "a4010103272006215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    test_de(data, key.clone());
+    test_de(data, PublicKey::Ed25519Key(key));
 }
 
 #[test]
