@@ -159,7 +159,7 @@ impl Expected for Crv {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "RawPublicKey")]
+#[serde(try_from = "RawEcPublicKey")]
 #[serde(untagged)]
 pub enum PublicKey {
     P256Key(P256PublicKey),
@@ -198,33 +198,33 @@ impl From<TotpPublicKey> for PublicKey {
     }
 }
 
-impl TryFrom<RawPublicKey> for PublicKey {
+impl TryFrom<RawEcPublicKey> for PublicKey {
     type Error = serde::de::value::Error;
 
-    fn try_from(raw: RawPublicKey) -> Result<Self, Self::Error> {
+    fn try_from(raw: RawEcPublicKey) -> Result<Self, Self::Error> {
         match raw {
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Ec2),
                 alg: Some(Alg::Es256),
                 crv: Some(Crv::P256),
                 x: Some(x),
                 y: Some(y),
             } => Ok(PublicKey::P256Key(P256PublicKey { x, y })),
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Ec2),
                 alg: Some(Alg::EcdhEsHkdf256),
                 crv: Some(Crv::P256),
                 x: Some(x),
                 y: Some(y),
             } => Ok(PublicKey::EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey { x, y })),
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Okp),
                 alg: Some(Alg::EdDsa),
                 crv: Some(Crv::Ed25519),
                 x: Some(x),
                 y: None,
             } => Ok(PublicKey::Ed25519Key(Ed25519PublicKey { x })),
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Symmetric),
                 alg: Some(Alg::Totp),
                 crv: None,
