@@ -33,7 +33,7 @@ quickcheck = "1.0.3"
 serde = "1"
 
 [features]
-backend-mldsa = ["dep:pqcrypto-mldsa"]
-backend-mldsa-44 = ["backend-mldsa"]
-backend-mldsa-65 = ["backend-mldsa"]
-backend-mldsa-87 = ["backend-mldsa"]
+mldsa = ["dep:pqcrypto-mldsa"]
+mldsa44 = ["mldsa"]
+mldsa65 = ["mldsa"]
+mldsa87 = ["mldsa"]

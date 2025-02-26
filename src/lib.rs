@@ -48,11 +48,11 @@ use ::with_builtin_macros::with_eager_expansions;
 use core::fmt::{self, Formatter};
 pub use heapless_bytes::Bytes;
 use paste::paste;
-#[cfg(feature = "backend-mldsa-44")]
+#[cfg(feature = "mldsa44")]
 use pqcrypto_mldsa::mldsa44;
-#[cfg(feature = "backend-mldsa-65")]
+#[cfg(feature = "mldsa65")]
 use pqcrypto_mldsa::mldsa65;
-#[cfg(feature = "backend-mldsa-87")]
+#[cfg(feature = "mldsa87")]
 use pqcrypto_mldsa::mldsa87;
 use serde::{
     de::{Error as _, Expected, MapAccess, Unexpected},
@@ -95,7 +95,7 @@ enum Kty {
     Okp = 1,
     Ec2 = 2,
     Symmetric = 4,
-    #[cfg(feature = "backend-mldsa")]
+    #[cfg(feature = "mldsa")]
     Pqc = 7,
 }
 
@@ -112,11 +112,11 @@ enum Alg {
     EdDsa = -8,
     Totp = -9, // Unassigned, we use it for TOTP
 
-    #[cfg(feature = "backend-mldsa-44")]
+    #[cfg(feature = "mldsa44")]
     Mldsa44 = -87,
-    #[cfg(feature = "backend-mldsa-65")]
+    #[cfg(feature = "mldsa65")]
     Mldsa65 = -88,
-    #[cfg(feature = "backend-mldsa-87")]
+    #[cfg(feature = "mldsa87")]
     Mldsa87 = -89,
 
     // MAC
@@ -166,11 +166,11 @@ pub enum PublicKey {
     EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey),
     Ed25519Key(Ed25519PublicKey),
     TotpKey(TotpPublicKey),
-    #[cfg(feature = "backend-mldsa-44")]
+    #[cfg(feature = "mldsa44")]
     Mldsa44(Mldsa44PublicKey),
-    #[cfg(feature = "backend-mldsa-65")]
+    #[cfg(feature = "mldsa65")]
     Mldsa65(Mldsa65PublicKey),
-    #[cfg(feature = "backend-mldsa-87")]
+    #[cfg(feature = "mldsa87")]
     Mldsa87(Mldsa87PublicKey),
 }
 
@@ -553,7 +553,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519PublicKey {
     }
 }
 
-#[cfg(feature = "backend-mldsa")]
+#[cfg(feature = "mldsa")]
 macro_rules! mldsa_public_key {
     ($mldsa_number: tt) => {
         paste! {
@@ -712,9 +712,9 @@ macro_rules! mldsa_public_key {
     };
 }
 
-#[cfg(feature = "backend-mldsa-44")]
+#[cfg(feature = "mldsa44")]
 mldsa_public_key!(44);
-#[cfg(feature = "backend-mldsa-65")]
+#[cfg(feature = "mldsa65")]
 mldsa_public_key!(65);
-#[cfg(feature = "backend-mldsa-87")]
+#[cfg(feature = "mldsa87")]
 mldsa_public_key!(87);
