@@ -31,6 +31,8 @@
 //! Key Type 4 (Symmetric)
 //! -1: k (key value)
 //!
+//! Key Type 6 (PQC)
+//! -1: pk (public key value)
 
 /*
    COSE_Key = {
@@ -42,9 +44,16 @@
        * label => values
    }
 */
-
+use ::with_builtin_macros::with_eager_expansions;
 use core::fmt::{self, Formatter};
 pub use heapless_bytes::Bytes;
+use paste::paste;
+#[cfg(feature = "mldsa44")]
+use pqcrypto_mldsa::mldsa44;
+#[cfg(feature = "mldsa65")]
+use pqcrypto_mldsa::mldsa65;
+#[cfg(feature = "mldsa87")]
+use pqcrypto_mldsa::mldsa87;
 use serde::{
     de::{Error as _, Expected, MapAccess, Unexpected},
     Deserialize, Serialize,
@@ -56,7 +65,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 enum Label {
     Kty = 1,
     Alg = 3,
-    Crv = -1,
+    CrvOrPk = -1,
     X = -2,
     Y = -3,
 }
@@ -70,7 +79,7 @@ impl TryFrom<i8> for Label {
         Ok(match label {
             1 => Self::Kty,
             3 => Self::Alg,
-            -1 => Self::Crv,
+            -1 => Self::CrvOrPk,
             -2 => Self::X,
             -3 => Self::Y,
             _ => {
@@ -86,6 +95,8 @@ enum Kty {
     Okp = 1,
     Ec2 = 2,
     Symmetric = 4,
+    #[cfg(feature = "mldsa")]
+    Pqc = 7,
 }
 
 impl Expected for Kty {
@@ -100,6 +111,13 @@ enum Alg {
     Es256 = -7, // ECDSA with SHA-256
     EdDsa = -8,
     Totp = -9, // Unassigned, we use it for TOTP
+
+    #[cfg(feature = "mldsa44")]
+    Mldsa44 = -87,
+    #[cfg(feature = "mldsa65")]
+    Mldsa65 = -88,
+    #[cfg(feature = "mldsa87")]
+    Mldsa87 = -89,
 
     // MAC
     // Hs256 = 5,
@@ -141,13 +159,19 @@ impl Expected for Crv {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "RawPublicKey")]
+#[serde(try_from = "RawEcPublicKey")]
 #[serde(untagged)]
 pub enum PublicKey {
     P256Key(P256PublicKey),
     EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey),
     Ed25519Key(Ed25519PublicKey),
     TotpKey(TotpPublicKey),
+    #[cfg(feature = "mldsa44")]
+    Mldsa44(Mldsa44PublicKey),
+    #[cfg(feature = "mldsa65")]
+    Mldsa65(Mldsa65PublicKey),
+    #[cfg(feature = "mldsa87")]
+    Mldsa87(Mldsa87PublicKey),
 }
 
 impl From<P256PublicKey> for PublicKey {
@@ -174,33 +198,33 @@ impl From<TotpPublicKey> for PublicKey {
     }
 }
 
-impl TryFrom<RawPublicKey> for PublicKey {
+impl TryFrom<RawEcPublicKey> for PublicKey {
     type Error = serde::de::value::Error;
 
-    fn try_from(raw: RawPublicKey) -> Result<Self, Self::Error> {
+    fn try_from(raw: RawEcPublicKey) -> Result<Self, Self::Error> {
         match raw {
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Ec2),
                 alg: Some(Alg::Es256),
                 crv: Some(Crv::P256),
                 x: Some(x),
                 y: Some(y),
             } => Ok(PublicKey::P256Key(P256PublicKey { x, y })),
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Ec2),
                 alg: Some(Alg::EcdhEsHkdf256),
                 crv: Some(Crv::P256),
                 x: Some(x),
                 y: Some(y),
             } => Ok(PublicKey::EcdhEsHkdf256Key(EcdhEsHkdf256PublicKey { x, y })),
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Okp),
                 alg: Some(Alg::EdDsa),
                 crv: Some(Crv::Ed25519),
                 x: Some(x),
                 y: None,
             } => Ok(PublicKey::Ed25519Key(Ed25519PublicKey { x })),
-            RawPublicKey {
+            RawEcPublicKey {
                 kty: Some(Kty::Symmetric),
                 alg: Some(Alg::Totp),
                 crv: None,
@@ -213,7 +237,7 @@ impl TryFrom<RawPublicKey> for PublicKey {
 }
 
 #[derive(Clone, Debug, Default)]
-struct RawPublicKey {
+struct RawEcPublicKey {
     kty: Option<Kty>,
     alg: Option<Alg>,
     crv: Option<Crv>,
@@ -221,20 +245,20 @@ struct RawPublicKey {
     y: Option<Bytes<32>>,
 }
 
-impl<'de> Deserialize<'de> for RawPublicKey {
+impl<'de> Deserialize<'de> for RawEcPublicKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         struct IndexedVisitor;
         impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
-            type Value = RawPublicKey;
+            type Value = RawEcPublicKey;
 
             fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
-                formatter.write_str("RawPublicKey")
+                formatter.write_str("RawEcPublicKey")
             }
 
-            fn visit_map<V>(self, mut map: V) -> Result<RawPublicKey, V::Error>
+            fn visit_map<V>(self, mut map: V) -> Result<RawEcPublicKey, V::Error>
             where
                 V: MapAccess<'de>,
             {
@@ -257,7 +281,7 @@ impl<'de> Deserialize<'de> for RawPublicKey {
                     Ok(key)
                 }
 
-                let mut public_key = RawPublicKey::default();
+                let mut public_key = RawEcPublicKey::default();
 
                 // As we cannot deserialize arbitrary values with cbor-smol, we do not support
                 // unknown keys before a known key.  If there are unknown keys, they must be at the
@@ -277,7 +301,7 @@ impl<'de> Deserialize<'de> for RawPublicKey {
                     key = next_key(&mut map)?;
                 }
 
-                if key == Key::Label(Label::Crv) {
+                if key == Key::Label(Label::CrvOrPk) {
                     public_key.crv = Some(map.next_value()?);
                     key = next_key(&mut map)?;
                 }
@@ -306,7 +330,7 @@ impl<'de> Deserialize<'de> for RawPublicKey {
     }
 }
 
-impl Serialize for RawPublicKey {
+impl Serialize for RawEcPublicKey {
     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -332,7 +356,7 @@ impl Serialize for RawPublicKey {
         }
         // -1: crv
         if let Some(crv) = &self.crv {
-            map.serialize_entry(&(Label::Crv as i8), &(*crv as i8))?;
+            map.serialize_entry(&(Label::CrvOrPk as i8), &(*crv as i8))?;
         }
         // -2: x
         if let Some(x) = &self.x {
@@ -354,7 +378,7 @@ trait PublicKeyConstants {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(into = "RawPublicKey")]
+#[serde(into = "RawEcPublicKey")]
 pub struct P256PublicKey {
     pub x: Bytes<32>,
     pub y: Bytes<32>,
@@ -366,7 +390,7 @@ impl PublicKeyConstants for P256PublicKey {
     const CRV: Crv = Crv::P256;
 }
 
-impl From<P256PublicKey> for RawPublicKey {
+impl From<P256PublicKey> for RawEcPublicKey {
     fn from(key: P256PublicKey) -> Self {
         Self {
             kty: Some(P256PublicKey::KTY),
@@ -379,7 +403,7 @@ impl From<P256PublicKey> for RawPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(into = "RawPublicKey")]
+#[serde(into = "RawEcPublicKey")]
 pub struct EcdhEsHkdf256PublicKey {
     pub x: Bytes<32>,
     pub y: Bytes<32>,
@@ -391,7 +415,7 @@ impl PublicKeyConstants for EcdhEsHkdf256PublicKey {
     const CRV: Crv = Crv::P256;
 }
 
-impl From<EcdhEsHkdf256PublicKey> for RawPublicKey {
+impl From<EcdhEsHkdf256PublicKey> for RawEcPublicKey {
     fn from(key: EcdhEsHkdf256PublicKey) -> Self {
         Self {
             kty: Some(EcdhEsHkdf256PublicKey::KTY),
@@ -404,7 +428,7 @@ impl From<EcdhEsHkdf256PublicKey> for RawPublicKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-#[serde(into = "RawPublicKey")]
+#[serde(into = "RawEcPublicKey")]
 pub struct Ed25519PublicKey {
     pub x: Bytes<32>,
 }
@@ -415,7 +439,7 @@ impl PublicKeyConstants for Ed25519PublicKey {
     const CRV: Crv = Crv::Ed25519;
 }
 
-impl From<Ed25519PublicKey> for RawPublicKey {
+impl From<Ed25519PublicKey> for RawEcPublicKey {
     fn from(key: Ed25519PublicKey) -> Self {
         Self {
             kty: Some(Ed25519PublicKey::KTY),
@@ -428,7 +452,7 @@ impl From<Ed25519PublicKey> for RawPublicKey {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
-#[serde(into = "RawPublicKey")]
+#[serde(into = "RawEcPublicKey")]
 pub struct TotpPublicKey {}
 
 impl PublicKeyConstants for TotpPublicKey {
@@ -437,7 +461,7 @@ impl PublicKeyConstants for TotpPublicKey {
     const CRV: Crv = Crv::None;
 }
 
-impl From<TotpPublicKey> for RawPublicKey {
+impl From<TotpPublicKey> for RawEcPublicKey {
     fn from(_key: TotpPublicKey) -> Self {
         Self {
             kty: Some(TotpPublicKey::KTY),
@@ -482,13 +506,13 @@ impl<'de> serde::Deserialize<'de> for P256PublicKey {
     where
         D: serde::Deserializer<'de>,
     {
-        let RawPublicKey {
+        let RawEcPublicKey {
             kty,
             alg,
             crv,
             x,
             y,
-        } = RawPublicKey::deserialize(deserializer)?;
+        } = RawEcPublicKey::deserialize(deserializer)?;
         check_key_constants::<P256PublicKey, D::Error>(kty, alg, crv)?;
         let x = x.ok_or_else(|| D::Error::missing_field("x"))?;
         let y = y.ok_or_else(|| D::Error::missing_field("y"))?;
@@ -501,13 +525,13 @@ impl<'de> serde::Deserialize<'de> for EcdhEsHkdf256PublicKey {
     where
         D: serde::Deserializer<'de>,
     {
-        let RawPublicKey {
+        let RawEcPublicKey {
             kty,
             alg,
             crv,
             x,
             y,
-        } = RawPublicKey::deserialize(deserializer)?;
+        } = RawEcPublicKey::deserialize(deserializer)?;
         check_key_constants::<EcdhEsHkdf256PublicKey, D::Error>(kty, alg, crv)?;
         let x = x.ok_or_else(|| D::Error::missing_field("x"))?;
         let y = y.ok_or_else(|| D::Error::missing_field("y"))?;
@@ -520,11 +544,177 @@ impl<'de> serde::Deserialize<'de> for Ed25519PublicKey {
     where
         D: serde::Deserializer<'de>,
     {
-        let RawPublicKey {
+        let RawEcPublicKey {
             kty, alg, crv, x, ..
-        } = RawPublicKey::deserialize(deserializer)?;
+        } = RawEcPublicKey::deserialize(deserializer)?;
         check_key_constants::<Ed25519PublicKey, D::Error>(kty, alg, crv)?;
         let x = x.ok_or_else(|| D::Error::missing_field("x"))?;
         Ok(Self { x })
     }
 }
+
+#[cfg(feature = "mldsa")]
+macro_rules! mldsa_public_key {
+    ($mldsa_number: tt) => {
+        paste! {
+            with_eager_expansions! {
+                #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+                #[serde(into = #{ concat!("RawMldsa", stringify!($mldsa_number), "PublicKey") })]
+                pub struct [<Mldsa $mldsa_number PublicKey>] {
+                    pub pk: Bytes<{ [<mldsa $mldsa_number>]::public_key_bytes() }>,
+                }
+
+                impl PublicKeyConstants for [<Mldsa $mldsa_number PublicKey>] {
+                    const KTY: Kty = Kty::Pqc;
+                    const ALG: Alg = Alg::[<Mldsa $mldsa_number>];
+                    const CRV: Crv = Crv::None;
+                }
+
+                impl From<[<Mldsa $mldsa_number PublicKey>]> for PublicKey {
+                    fn from(key: [<Mldsa $mldsa_number PublicKey>]) -> Self {
+                        PublicKey::[<Mldsa $mldsa_number>](key)
+                    }
+                }
+
+                #[derive(Clone, Debug, Default)]
+                struct [<RawMldsa $mldsa_number PublicKey>] {
+                    kty: Option<Kty>,
+                    alg: Option<Alg>,
+                    pk: Option<Bytes<{ [<mldsa $mldsa_number>]::public_key_bytes() }>>,
+                }
+
+                impl From<[<Mldsa $mldsa_number PublicKey>]> for [<RawMldsa $mldsa_number PublicKey>] {
+                    fn from(key: [<Mldsa $mldsa_number PublicKey>]) -> Self {
+                        Self {
+                            kty: Some([<Mldsa $mldsa_number PublicKey>]::KTY),
+                            alg: Some([<Mldsa $mldsa_number PublicKey>]::ALG),
+                            pk: Some(key.pk),
+                        }
+                    }
+                }
+
+                impl<'de> serde::Deserialize<'de> for [<Mldsa $mldsa_number PublicKey>] {
+                    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        let [<RawMldsa $mldsa_number PublicKey>] { kty, alg, pk, .. } =
+                        [<RawMldsa $mldsa_number PublicKey>]::deserialize(deserializer)?;
+                        check_key_constants::<[<Mldsa $mldsa_number PublicKey>], D::Error>(kty, alg, Some(Crv::None))?;
+                        let pk = pk.ok_or_else(|| D::Error::missing_field("pk"))?;
+                        Ok(Self { pk })
+                    }
+                }
+
+                impl<'de> Deserialize<'de> for [<RawMldsa $mldsa_number PublicKey>] {
+                    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where
+                        D: serde::Deserializer<'de>,
+                    {
+                        struct IndexedVisitor;
+                        impl<'de> serde::de::Visitor<'de> for IndexedVisitor {
+                            type Value = [<RawMldsa $mldsa_number PublicKey>];
+
+                            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                                formatter.write_str(concat!("RawMldsa", stringify!($mldsa_number), "PublicKey"))
+                            }
+
+                            fn visit_map<V>(self, mut map: V) -> Result<[<RawMldsa $mldsa_number PublicKey>], V::Error>
+                            where
+                                V: MapAccess<'de>,
+                            {
+                                #[derive(PartialEq)]
+                                enum Key {
+                                    Label(Label),
+                                    Unknown(i8),
+                                    None,
+                                }
+
+                                fn next_key<'a, V: MapAccess<'a>>(map: &mut V) -> Result<Key, V::Error> {
+                                    let key: Option<i8> = map.next_key()?;
+                                    let key = match key {
+                                        Some(key) => match Label::try_from(key) {
+                                            Ok(label) => Key::Label(label),
+                                            Err(_) => Key::Unknown(key),
+                                        },
+                                        None => Key::None,
+                                    };
+                                    Ok(key)
+                                }
+
+                                let mut public_key = [<RawMldsa $mldsa_number PublicKey>]::default();
+
+                                // As we cannot deserialize arbitrary values with cbor-smol, we do not support
+                                // unknown keys before a known key.  If there are unknown keys, they must be at the
+                                // end.
+
+                                // only deserialize in canonical order
+
+                                let mut key = next_key(&mut map)?;
+
+                                if key == Key::Label(Label::Kty) {
+                                    public_key.kty = Some(map.next_value()?);
+                                    key = next_key(&mut map)?;
+                                }
+
+                                if key == Key::Label(Label::Alg) {
+                                    public_key.alg = Some(map.next_value()?);
+                                    key = next_key(&mut map)?;
+                                }
+
+                                if key == Key::Label(Label::CrvOrPk) {
+                                    public_key.pk = Some(map.next_value()?);
+                                    key = next_key(&mut map)?;
+                                }
+
+                                // if there is another key, it should be an unknown one
+                                if matches!(key, Key::Label(_)) {
+                                    Err(serde::de::Error::custom(
+                                        "public key data in wrong order or with duplicates",
+                                    ))
+                                } else {
+                                    Ok(public_key)
+                                }
+                            }
+                        }
+                        deserializer.deserialize_map(IndexedVisitor {})
+                    }
+                }
+
+                impl Serialize for [<RawMldsa $mldsa_number PublicKey>] {
+                    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+                    where
+                        S: serde::Serializer,
+                    {
+                        let is_set = [self.kty.is_some(), self.alg.is_some(), self.pk.is_some()];
+                        let fields = is_set.into_iter().map(usize::from).sum();
+                        use serde::ser::SerializeMap;
+                        let mut map = serializer.serialize_map(Some(fields))?;
+
+                        //  1: kty
+                        if let Some(kty) = &self.kty {
+                            map.serialize_entry(&(Label::Kty as i8), &(*kty as i8))?;
+                        }
+                        //  3: alg
+                        if let Some(alg) = &self.alg {
+                            map.serialize_entry(&(Label::Alg as i8), &(*alg as i8))?;
+                        }
+                        // -1: pk
+                        if let Some(pk) = &self.pk {
+                            map.serialize_entry(&(Label::CrvOrPk as i8), pk)?;
+                        }
+
+                        map.end()
+                    }
+                }
+            }
+        }
+    };
+}
+
+#[cfg(feature = "mldsa44")]
+mldsa_public_key!(44);
+#[cfg(feature = "mldsa65")]
+mldsa_public_key!(65);
+#[cfg(feature = "mldsa87")]
+mldsa_public_key!(87);

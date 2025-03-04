@@ -11,8 +11,13 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
+cfg-if = "1.0.0"
 heapless-bytes = "0.3.0"
+pqcrypto-mldsa = { version = "0.1.0", optional = true}
+serde-big-array = "0.5.1"
 serde_repr = "0.1"
+paste = "1.0"
+with_builtin_macros = "0.1.0"
 
 [dependencies.serde]
 version = "1.0"
@@ -26,3 +31,9 @@ hex = "0.4.3"
 itertools = "0.12.0"
 quickcheck = "1.0.3"
 serde = "1"
+
+[features]
+mldsa = ["dep:pqcrypto-mldsa"]
+mldsa44 = ["mldsa"]
+mldsa65 = ["mldsa"]
+mldsa87 = ["mldsa"]
