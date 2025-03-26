@@ -48,6 +48,8 @@ use ::with_builtin_macros::with_eager_expansions;
 use core::fmt::{self, Formatter};
 pub use heapless_bytes::Bytes;
 use paste::paste;
+// These are used in the macro (which chooses crate name dynamically),
+// so rust-analyzer might not detect that they are needed.
 #[cfg(feature = "mldsa44")]
 use pqcrypto_mldsa::mldsa44;
 #[cfg(feature = "mldsa65")]
@@ -95,6 +97,8 @@ enum Kty {
     Okp = 1,
     Ec2 = 2,
     Symmetric = 4,
+    // Official assigned COSE key types (https://www.iana.org/assignments/cose/cose.xhtml#key-type)
+    // are 0 - 6, so we choose 7 for PQC keys (they do not yet have an official assignment)
     #[cfg(feature = "mldsa")]
     Pqc = 7,
 }
@@ -112,6 +116,13 @@ enum Alg {
     EdDsa = -8,
     Totp = -9, // Unassigned, we use it for TOTP
 
+    // Algorithm IDs are not officially assigned for ML-DSA yet.
+    // When they are, they'll be here:
+    // https://www.iana.org/assignments/cose/cose.xhtml#algorithms
+    // We have to use something in the meantime. In Star Trek cannon,
+    // "Dilithium" has element number 87, so we start with -87 for
+    // Dilithium2 (ML-DSA44) and go from there.
+    // This will need to be updated once official algorithm IDs are assigned.
     #[cfg(feature = "mldsa44")]
     Mldsa44 = -87,
     #[cfg(feature = "mldsa65")]
