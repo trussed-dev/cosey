@@ -1,12 +1,20 @@
 use core::fmt::Debug;
 
-use cbor_smol::{cbor_deserialize, cbor_serialize_bytes};
+use cbor_smol::{cbor_deserialize, cbor_serialize_to};
 use ciborium::Value;
 use cosey::{EcdhEsHkdf256PublicKey, Ed25519PublicKey, P256PublicKey, PublicKey};
 use heapless_bytes::Bytes;
 use itertools::Itertools as _;
 use quickcheck::{Arbitrary, Gen};
 use serde::{de::DeserializeOwned, Serialize};
+
+pub fn cbor_serialize_bytes<const N: usize, T: ?Sized + serde::Serialize>(
+    value: &T,
+) -> cbor_smol::Result<Bytes<N>> {
+    let mut writer = Bytes::new();
+    cbor_serialize_to(value, &mut writer)?;
+    Ok(writer)
+}
 
 #[derive(Clone, Debug)]
 struct Input(Bytes<32>);
@@ -15,7 +23,7 @@ impl Arbitrary for Input {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut data = vec![0; 32];
         data.fill_with(|| u8::arbitrary(g));
-        Self(Bytes::from_slice(&data).unwrap())
+        Self(Bytes::try_from(data.as_slice()).unwrap())
     }
 }
 
@@ -147,8 +155,8 @@ fn test_de_order<T: Serialize + DeserializeOwned + Debug + PartialEq>(data: T) -
 
 #[test]
 fn de_p256() {
-    let x = Bytes::from_slice(&[0xff; 32]).unwrap();
-    let y = Bytes::from_slice(&[0xff; 32]).unwrap();
+    let x = Bytes::try_from([0xff; 32].as_slice()).unwrap();
+    let y = Bytes::try_from([0xff; 32].as_slice()).unwrap();
     let key = P256PublicKey { x, y };
     let data = "a5010203262001215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff225820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
     test_de(data, key.clone());
@@ -157,8 +165,8 @@ fn de_p256() {
 
 #[test]
 fn de_ecdh() {
-    let x = Bytes::from_slice(&[0xff; 32]).unwrap();
-    let y = Bytes::from_slice(&[0xff; 32]).unwrap();
+    let x = Bytes::try_from([0xff; 32].as_slice()).unwrap();
+    let y = Bytes::try_from([0xff; 32].as_slice()).unwrap();
     let key = EcdhEsHkdf256PublicKey { x, y };
     let data = "a501020338182001215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff225820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
     test_de(data, key.clone());
@@ -167,7 +175,7 @@ fn de_ecdh() {
 
 #[test]
 fn de_ed25519() {
-    let x = Bytes::from_slice(&[0xff; 32]).unwrap();
+    let x = Bytes::try_from([0xff; 32].as_slice()).unwrap();
     let key = Ed25519PublicKey { x };
     let data =
         "a4010103272006215820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
