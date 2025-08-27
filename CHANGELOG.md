@@ -2,9 +2,11 @@
 
 ## Unreleased
 
--
+[All Changes](https://github.com/trussed-dev/cosey/compare/v0.4.0...HEAD)
 
-[All Changes](https://github.com/trussed-dev/cosey/compare/v0.3.2...HEAD)
+## [v0.4.0](https://github.com/trussed-dev/cosey/releases/tag/v0.4.0)
+
+- Update `heapless-bytes` to 0.5.0 ([#15](https://github.com/trussed-dev/cosey/pull/15))
 
 ## [v0.3.2](https://github.com/trussed-dev/cosey/releases/tag/v0.3.2) (2025-02-26)
 
